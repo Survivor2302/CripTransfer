@@ -7,7 +7,6 @@
 ```
 
 ```
-
 - .\venv\Scripts\activate
 ```
 
