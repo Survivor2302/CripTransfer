@@ -1,8 +1,19 @@
-# installer les dépendances : 
-- pip install fastapi uvicorn
-- pip install cryptography
-- pip install fastapi uvicorn jinja2
+### Créer environnement virtuel
 
+# Windows
+
+- python3 -m venv venv
+
+- .\venv\Scripts\activate
+
+# macOS/Linux
+
+- source venv/bin/activate
+
+# installer les dépendance
+
+- pip install -r requirements.txt
 
 # lancer le projet :
+
 - uvicorn api:app --reload
