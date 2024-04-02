@@ -1,19 +1,30 @@
-### Créer environnement virtuel
+# Créer environnement virtuel
 
-# Windows
+### Windows
 
+```
 - python3 -m venv venv
+```
+
+```
 
 - .\venv\Scripts\activate
+```
 
-# macOS/Linux
+### macOS/Linux
 
+```
 - source venv/bin/activate
+```
 
 # installer les dépendance
 
+```
 - pip install -r requirements.txt
+```
 
 # lancer le projet :
 
+```
 - uvicorn api:app --reload
+```
