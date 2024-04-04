@@ -1,10 +1,10 @@
 # Créer environnement virtuel
 
-### Windows
-
 ```
 python3 -m venv venv
 ```
+
+### Windows
 
 ```
 .\venv\Scripts\activate
