@@ -59,6 +59,10 @@ async def upload_file(request: Request, file: Optional[UploadFile] = File(...), 
     # Chiffrer le nom de fichier
     encrypted_file_name = encrypt_file_id(filename)
 
+    # Créer le chemin du dossier "uploads" s'il n'existe pas
+    if not os.path.exists("uploads"):
+        os.makedirs("uploads")
+
     # Créer le chemin du fichier
     file_path = os.path.join("uploads", encrypted_file_name)
     
