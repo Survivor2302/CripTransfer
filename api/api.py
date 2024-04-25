@@ -43,7 +43,7 @@ async def upload_file(file: UploadFile = File(...)):
     experation_date = datetime.datetime.now() + datetime.timedelta(days=7)
     is_unique = True
     file_id = uuid.uuid4()
-    print(file_id)
+    password = "password"
 
     upload_folder = Path('uploads')
     upload_folder.mkdir(exist_ok=True)
@@ -60,6 +60,7 @@ async def upload_file(file: UploadFile = File(...)):
     files.append(
         {
             "file_id": file_id,
+            "password": password,
             "filename": safe_filename,
             "expiration": experation_date,
             "is_unique": is_unique,
