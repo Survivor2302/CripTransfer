@@ -50,7 +50,10 @@ function HomePage() {
             hashedPassword
           ).toString();
 
-          const encryptedFileName = CryptoJS.SHA256(file.name).toString();
+          const encryptedFileName = CryptoJS.AES.encrypt(
+            file.name,
+            hashedPassword
+          ).toString();
 
           // Create a new FormData instance
           const formData = new FormData();
@@ -59,7 +62,7 @@ function HomePage() {
           const blob = new Blob([encrypted], { type: "text/plain" });
 
           // Append the blob to the FormData instance
-          formData.append("file", blob, encryptedFileName);
+          formData.append("file", blob, encrypted);
 
           formData.append("password", hashedPassword);
 

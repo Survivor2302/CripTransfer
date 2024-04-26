@@ -33,6 +33,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"]
 )
 # Initialiser le fichier JSON s'il n'existe pas
 
@@ -127,6 +128,6 @@ async def download_file(request: Request, file_id: str = Form(...), password: st
 
         print("file_name", file["filename"])
 
-        return FileResponse(file_path, headers={"Content-Disposition": f"attachment; filename={file['filename']}"})
+        return FileResponse(file_path, headers={"Content-Disposition": f"{file['filename']}"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

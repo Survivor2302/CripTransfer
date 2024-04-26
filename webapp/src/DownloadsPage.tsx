@@ -22,16 +22,26 @@ function DownloadsPage() {
         if (!response.ok) {
           throw new Error("Network response was not ok");
         }
-        console.log(response.headers.get("Content-Disposition"));
+        const hashedFileName = response.headers.get("Content-Disposition");
+
+        if (!hashedFileName) {
+          throw new Error("No Content-Disposition header found");
+        }
+
         return response.blob();
       })
       .then((blob) => {
+        /*
+        ###########################
+        @@@@@faut decrypter la@@@@@
+        ###########################
+        */
         console.log("Success:", blob);
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.style.display = "none";
         a.href = url;
-        a.download = ""; // Le navigateur utilisera le nom du fichier de l'en-tête `Content-Disposition`
+        a.download = "";
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
