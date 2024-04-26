@@ -46,7 +46,7 @@ function HomePage() {
           const arrayBuffer = (event.target.result as ArrayBuffer).slice(0);
           const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
           const encrypted = CryptoJS.AES.encrypt(
-            JSON.stringify(wordArray),
+            wordArray,
             hashedPassword
           ).toString();
 
@@ -62,10 +62,10 @@ function HomePage() {
           const blob = new Blob([encrypted], { type: "text/plain" });
 
           // Append the blob to the FormData instance
-          formData.append("file", blob, encrypted);
+          formData.append("file", blob, encryptedFileName);
 
           formData.append("password", hashedPassword);
-
+          
           formData.append("expiryTime", expiryTime.toString());
 
           formData.append("singleUseLink", singleUseLink.toString());

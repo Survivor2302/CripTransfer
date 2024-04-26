@@ -128,6 +128,6 @@ async def download_file(request: Request, file_id: str = Form(...), password: st
 
         print("file_name", file["filename"])
 
-        return FileResponse(file_path, headers={"Content-Disposition": f"{file['filename']}"})
+        return FileResponse(file_path, headers={"Content-Disposition": f"={file['filename']}"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
