@@ -8,6 +8,8 @@ import shutil
 import smtplib
 from email.message import EmailMessage
 import base64
+import json
+
 
 app = FastAPI()
 
@@ -20,7 +22,8 @@ server.login(email, password)
 
 
 # BDD
-files = []
+# files = []
+json_db_path = 'files_db.json'
 
 
 app.add_middleware(
@@ -31,6 +34,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Initialiser le fichier JSON s'il n'existe pas
+
+
+def init_json_db():
+    try:
+        with open(json_db_path, 'x') as f:
+            json.dump([], f)
+    except FileExistsError:
+        pass
+
+
+init_json_db()
+
+
+def read_json_db():
+    with open(json_db_path, 'r') as f:
+        return json.load(f)
+
+
+def write_json_db(data):
+    with open(json_db_path, 'w') as f:
+        json.dump(data, f)
 
 
 @app.get("/")
@@ -39,43 +64,46 @@ async def root():
 
 
 @app.post("/upload/")
-async def upload_file(file: UploadFile = File(...)):
-    experation_date = datetime.datetime.now() + datetime.timedelta(days=7)
-    is_unique = True
+async def upload_file(
+    file: UploadFile = File(...),
+    password: str = Form(...),
+    expiryTime: datetime.datetime = Form(...),
+    singleUseLink: bool = Form(...),
+    email: str = Form(...)
+):
     file_id = uuid.uuid4()
-    password = "password"
 
     upload_folder = Path('uploads')
     upload_folder.mkdir(exist_ok=True)
+
     # Encode the filename to a safe format
-    safe_filename = base64.urlsafe_b64encode(file.filename.encode()).decode()
-    file_path = upload_folder / safe_filename
+    file_path = upload_folder / file.filename
+
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
     # Envoi de l'email
-    send_email(safe_filename, 'lebou23@gmail.com')
+    send_email(file_id, email)
 
     # Ajout du fichier à la liste
-    files.append(
-        {
-            "file_id": file_id,
-            "password": password,
-            "filename": safe_filename,
-            "expiration": experation_date,
-            "is_unique": is_unique,
-            "is_already_downloaded": False,
-        }
-    )
+    files = read_json_db()
+    files.append({
+        "file_id": str(file_id),
+        "password": password,
+        "filename": file.filename,
+        "expiration": expiryTime.isoformat(),
+        "is_unique": singleUseLink,
+    })
+    write_json_db(files)
 
-    return {"filename": safe_filename}
+    return {"filename": file.filename}
 
 
-def send_email(filename, receiver_email):
-    file_link = f"http://localhost:3000/download/{filename}"
+def send_email(file_id, receiver_email):
+    file_link = f"http://localhost:3000/download/{file_id}"
     msg = EmailMessage()
     msg.set_content(
-        f"Un nouveau fichier a été uploadé: {filename}\nAccédez au fichier ici: {file_link}", subtype='html')
+        f"nAccédez au fichier ici: {file_link}", subtype='html')
     msg['Subject'] = 'Nouveau fichier uploadé'
     msg['From'] = email
     msg['To'] = receiver_email
@@ -85,34 +113,19 @@ def send_email(filename, receiver_email):
 
 
 # Fonction pour télécharger le fichier
-@app.post("/download/{file_id}/")
-async def download_file(request: Request, file_id: str, password: str = Form(...)):
+@app.post("/download/")
+async def download_file(request: Request, file_id: str = Form(...), password: str = Form(...)):
+    files = read_json_db()
 
     try:
-        file = next(
-            (file for file in files if file["file_id"] == file_id), None)
-        if file is None:
-            raise HTTPException(status_code=404, detail="File not found")
+        file = next(file for file in files if file["file_id"] == file_id)
+        if file["password"] != password:
+            raise HTTPException(
+                status_code=401, detail="Mot de passe incorrect")
 
-        if datetime.datetime.now() > file["expiration"]:
-            files.remove(file)
-            raise HTTPException(status_code=404, detail="File expired")
+        file_path = Path('uploads') / file["filename"]
 
-        if password != "password":
-            raise HTTPException(status_code=401, detail="Wrong password")
-
-        file_path = Path("uploads") / file["filename"]
-
-        if file["is_unique"]:
-            if file["is_already_downloaded"]:
-                files.remove(file)
-                file_path.unlink()
-                raise HTTPException(
-                    status_code=404, detail="File already downloaded")
-            else:
-                file["is_already_downloaded"] = True
-
-        # uncrypt the file
+        print("file_name", file["filename"])
 
         return FileResponse(file_path, headers={"Content-Disposition": f"attachment; filename={file['filename']}"})
     except Exception as e:

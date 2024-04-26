@@ -19,7 +19,7 @@ function HomePage() {
   const handleExpiryTimeChange = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    setExpiryTime(Number(event.target.value));
+    setExpiryTime(new Date(event.target.value).getTime());
   };
 
   const handleSingleUseLinkChange = (
@@ -40,17 +40,17 @@ function HomePage() {
 
       reader.onload = function (event) {
         if (event.target) {
+          const hashedPassword = CryptoJS.SHA256(password).toString();
+          console.log({ password: hashedPassword });
+
           const arrayBuffer = (event.target.result as ArrayBuffer).slice(0);
           const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
           const encrypted = CryptoJS.AES.encrypt(
-            wordArray,
-            password
+            JSON.stringify(wordArray),
+            hashedPassword
           ).toString();
 
-          const encryptedFileName = CryptoJS.AES.encrypt(
-            file.name,
-            password
-          ).toString();
+          const encryptedFileName = CryptoJS.SHA256(file.name).toString();
 
           // Create a new FormData instance
           const formData = new FormData();
@@ -60,6 +60,14 @@ function HomePage() {
 
           // Append the blob to the FormData instance
           formData.append("file", blob, encryptedFileName);
+
+          formData.append("password", hashedPassword);
+
+          formData.append("expiryTime", expiryTime.toString());
+
+          formData.append("singleUseLink", singleUseLink.toString());
+
+          formData.append("email", email);
 
           // Send encrypted file to your server
           fetch("http://localhost:8000/upload", {
@@ -91,7 +99,13 @@ function HomePage() {
         onSubmit={handleSubmit}
       >
         <h2>Téléverser un fichier</h2>
-        <input type="file" id="file" name="file" onChange={handleFileChange} />
+        <input
+          type="file"
+          id="file"
+          name="file"
+          onChange={handleFileChange}
+          required
+        />
         <br />
 
         <input
@@ -100,13 +114,15 @@ function HomePage() {
           name="encryptionPassword"
           placeholder="Mot de passe de chiffrement"
           onChange={handlePasswordChange}
+          required
         />
         <br />
         <input
-          type="number"
+          type="date"
           id="expiryTime"
+          min={new Date().toISOString().split("T")[0]}
           name="expiryTime"
-          placeholder="Délai d'expiration en heures"
+          placeholder="Délai d'expiration"
           onChange={handleExpiryTimeChange}
         />
         <br />
@@ -126,6 +142,7 @@ function HomePage() {
           name="email"
           placeholder="Email pour envoyer le lien"
           onChange={handleEmailChange}
+          required
         />
         <br />
 
