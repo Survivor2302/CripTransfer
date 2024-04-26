@@ -1,13 +1,12 @@
 import datetime
 import uuid
-from fastapi import FastAPI, Form, Request, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import shutil
 import smtplib
 from email.message import EmailMessage
-import base64
 import json
 
 
@@ -72,13 +71,14 @@ async def upload_file(
     singleUseLink: bool = Form(...),
     email: str = Form(...)
 ):
+    # Générer un ID unique pour le fichier
     file_id = uuid.uuid4()
 
     upload_folder = Path('uploads')
     upload_folder.mkdir(exist_ok=True)
 
     # Encode the filename to a safe format
-    file_path = upload_folder / file.filename
+    file_path = upload_folder.joinpath(str(file_id))
 
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -90,14 +90,14 @@ async def upload_file(
     files = read_json_db()
     files.append({
         "file_id": str(file_id),
+        "file_name": file.filename,
         "password": password,
-        "filename": file.filename,
         "expiration": expiryTime.isoformat(),
         "is_unique": singleUseLink,
     })
     write_json_db(files)
 
-    return {"filename": file.filename}
+    return {"file_id": str(file_id)}
 
 
 def send_email(file_id, receiver_email):
@@ -115,19 +115,22 @@ def send_email(file_id, receiver_email):
 
 # Fonction pour télécharger le fichier
 @app.post("/download/")
-async def download_file(request: Request, file_id: str = Form(...), password: str = Form(...)):
+async def download_file(file_id: str = Form(...), password: str = Form(...)):
     files = read_json_db()
+    print(files)
+    print(file_id)
 
     try:
         file = next(file for file in files if file["file_id"] == file_id)
+        print(file)
         if file["password"] != password:
             raise HTTPException(
                 status_code=401, detail="Mot de passe incorrect")
+        print("zizi")
+        file_path = Path('uploads').joinpath(file["file_id"])
+        print(file_path)
 
-        file_path = Path('uploads') / file["filename"]
-
-        print("file_name", file["filename"])
-
-        return FileResponse(file_path, headers={"Content-Disposition": f"={file['filename']}"})
+        return FileResponse(file_path, filename=file["file_name"])
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(e)
+    raise HTTPException(status_code=500, detail=str(e))

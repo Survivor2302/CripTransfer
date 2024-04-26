@@ -41,19 +41,23 @@ function HomePage() {
       reader.onload = function (event) {
         if (event.target) {
           const hashedPassword = CryptoJS.SHA256(password).toString();
-          console.log({ password: hashedPassword });
-
+          
           const arrayBuffer = (event.target.result as ArrayBuffer).slice(0);
           const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
           const encrypted = CryptoJS.AES.encrypt(
             wordArray,
             hashedPassword
           ).toString();
-
+          
           const encryptedFileName = CryptoJS.AES.encrypt(
             file.name,
             hashedPassword
           ).toString();
+          
+          // const unencryptedFileName = CryptoJS.AES.decrypt(
+          //   encryptedFileName,
+          //   hashedPassword
+          // ).toString(CryptoJS.enc.Utf8);
 
           // Create a new FormData instance
           const formData = new FormData();
@@ -65,14 +69,17 @@ function HomePage() {
           formData.append("file", blob, encryptedFileName);
 
           formData.append("password", hashedPassword);
-          
+
           formData.append("expiryTime", expiryTime.toString());
 
           formData.append("singleUseLink", singleUseLink.toString());
 
           formData.append("email", email);
 
+          // console.log({ formData });
+
           // Send encrypted file to your server
+
           fetch("http://localhost:8000/upload", {
             method: "POST",
             body: formData,
@@ -123,7 +130,11 @@ function HomePage() {
         <input
           type="date"
           id="expiryTime"
-          min={new Date().toISOString().split("T")[0]}
+          min={
+            new Date(new Date().getTime() + 24 * 60 * 60 * 1000)
+              .toISOString()
+              .split("T")[0]
+          }
           name="expiryTime"
           placeholder="Délai d'expiration"
           onChange={handleExpiryTimeChange}
