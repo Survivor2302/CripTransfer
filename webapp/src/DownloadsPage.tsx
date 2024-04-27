@@ -6,69 +6,100 @@ function DownloadsPage() {
   const { id } = useParams();
   const [password, setPassword] = useState("");
 
-  const handleSubmit = (event: { preventDefault: () => void }) => {
+  const handleSubmit = async (event: { preventDefault: () => void }) => {
     event.preventDefault();
+
     const hashedPassword = CryptoJS.SHA256(password).toString();
     const formData = new FormData();
     formData.append("file_id", id!);
     formData.append("password", hashedPassword);
 
-    fetch("http://localhost:8000/download", {
-      method: "POST",
-      body: formData,
-    })
-      .then((response) => {
-        console.log(response);
-        if (!response.ok) {
-          throw new Error("Network response was not ok");
-        }
-        const hashedFileName = response.headers.get("Content-Disposition");
-
-        if (!hashedFileName) {
-          throw new Error("No Content-Disposition header found");
-        }
-
-        return response.blob();
-      })
-      .then(async (blob) => {
-        console.log(blob);
-        const arrayBuffer = await blobToArrayBuffer(blob);
-        console.log(arrayBuffer);
-        const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
-        console.log(wordArray);
-        const encryptedData = wordArray.toString(CryptoJS.enc.Base64); // Convertir le WordArray en chaîne Base64 pour le décryptage
-        const decrypted = CryptoJS.AES.decrypt(
-          encryptedData, // Passer la chaîne chiffrée
-          hashedPassword,
-          {
-            mode: CryptoJS.mode.CFB,
-            padding: CryptoJS.pad.Pkcs7,
-          }
-        );
-
-        console.log(decrypted);
-
-        const decryptedText = decrypted.toString(CryptoJS.enc.Utf8); // Convertir le résultat décrypté en texte UTF-8
-
-        const decryptedBlob = new Blob([decryptedText], {
-          type: "application/octet-stream",
-        });
-        const url = window.URL.createObjectURL(decryptedBlob);
-        const a = document.createElement("a");
-        a.style.display = "none";
-        a.href = url;
-        a.download = "decrypted_file.png"; // Utiliser le nom de fichier original ou extrait du Content-Disposition
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
-
-        console.log("Success:", decryptedText);
-      })
-      .catch((error) => {
-        console.error("Error downloading the file:", error);
+    try {
+      const response = await fetch("http://localhost:8000/download", {
+        method: "POST",
+        body: formData,
       });
+
+      console.log(response);
+
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+
+      const hashedFileName = response.headers.get("Content-Disposition");
+      console.log("filename : " + hashedFileName)
+
+      if (!hashedFileName) {
+        throw new Error("No Content-Disposition header found");
+      }
+
+      const blob = await response.blob();
+      console.log("blob:", blob.text);
+
+      const arrayBuffer = await blob.arrayBuffer();
+      console.log("arrayBuffer:", arrayBuffer.slice);
+
+      // Convertir ArrayBuffer en WordArray de CryptoJS
+      const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
+      console.log("wordArray:", wordArray.words);
+
+
+      // Convertir WordArray en chaîne Base64
+      const encryptedData = wordArray.toString(CryptoJS.enc.Base64);
+
+
+      console.log("hash : " + hashedPassword);
+      // Décrypter les données
+      const decrypted = CryptoJS.AES.decrypt(
+        encryptedData,
+        hashedPassword,
+
+      ).toString();
+
+
+      /*const decrypted = CryptoJS.AES.decrypt(
+        encryptedData,
+        hashedPassword,
+        {
+          mode: CryptoJS.mode.CFB,
+          padding: CryptoJS.pad.Pkcs7,
+        }
+      );
+      */
+
+      console.log("decrycpter : " + decrypted);
+
+      // Convertir le résultat décrypté en texte UTF-8
+      //const decryptedText = decrypted.toString(CryptoJS.enc.Utf8);
+      //console.log("decrypted text:", decryptedText);
+
+
+      // Convertir le texte décrypté en Blob pour téléchargement
+      const decryptedBlob = new Blob([decrypted], {
+        type: "application/octet-stream",
+      });
+
+
+      const url = window.URL.createObjectURL(decryptedBlob);
+      const a = document.createElement("a");
+      console.log(a);
+      a.href = url;
+      a.download = "decrypted_file.png"; // Utilisez le nom de fichier approprié
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+
+
+      console.log("Success:", decrypted);
+
+    } catch (error) {
+      console.error("Error downloading the file:", error);
+    }
   };
+
+
+
 
   return (
     <div>

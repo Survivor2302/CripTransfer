@@ -117,20 +117,25 @@ def send_email(file_id, receiver_email):
 @app.post("/download/")
 async def download_file(file_id: str = Form(...), password: str = Form(...)):
     files = read_json_db()
-    print(files)
-    print(file_id)
-
+   # print(files)
+    #print(file_id)
+    #print("les données sont : " + file + " pour le file id suivant : " + file_id)
     try:
         file = next(file for file in files if file["file_id"] == file_id)
+        print("les données sont : ")
         print(file)
+        print("pour le file id suivant :")
+        print(file_id)
         if file["password"] != password:
             raise HTTPException(
                 status_code=401, detail="Mot de passe incorrect")
-        print("zizi")
+        print("ouai")
         file_path = Path('uploads').joinpath(file["file_id"])
+        print("file_path : ")
         print(file_path)
 
         return FileResponse(file_path, filename=file["file_name"])
     except Exception as e:
         print(e)
-    raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=500, detail="Une erreur s'est produite lors de la gestion de la requête")
+
