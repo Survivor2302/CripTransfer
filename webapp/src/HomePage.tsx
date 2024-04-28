@@ -1,108 +1,73 @@
 import React, { useState } from "react";
 import CryptoJS from "crypto-js";
+import { v4 as uuidv4 } from "uuid";
 
 function HomePage() {
-  const [file, setFile] = useState<File | null>(null);
-  const [password, setPassword] = useState("");
-  const [expiryTime, setExpiryTime] = useState(0);
-  const [singleUseLink, setSingleUseLink] = useState(false);
-  const [email, setEmail] = useState("");
+  const [formData, setFormData] = useState({
+    file: null as File | null,
+    password: "",
+    expiryTime: 0,
+    singleUseLink: false,
+    email: "",
+  });
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setFile(event.target.files?.[0] || null);
-  };
-
-  const handlePasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setPassword(event.target.value);
-  };
-
-  const handleExpiryTimeChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setExpiryTime(new Date(event.target.value).getTime());
-  };
-
-  const handleSingleUseLinkChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setSingleUseLink(event.target.checked);
-  };
-
-  const handleEmailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setEmail(event.target.value);
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked, files } = event.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]:
+        type === "file" ? files![0] : type === "checkbox" ? checked : value,
+    }));
   };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    var reader = new FileReader();
+    reader.onload = async () => {
+      var encryptionPassword = CryptoJS.SHA256(formData.password).toString();
+      var wordArray = CryptoJS.lib.WordArray.create(
+        reader.result as ArrayBuffer
+      ); // Convert: ArrayBuffer -> WordArray
+      var encrypted = CryptoJS.AES.encrypt(
+        wordArray,
+        encryptionPassword
+      ).toString(); // Encryption: I: WordArray -> O: -> Base64 encoded string (OpenSSL-format)
 
-    if (file) {
-      const reader = new FileReader();
+      var fileEnc = new Blob([encrypted]); // Create blob from string
 
-      reader.onload = function (event) {
-        if (event.target) {
-          const hashedPassword = CryptoJS.SHA256(password).toString();
-          
-          const arrayBuffer = (event.target.result as ArrayBuffer).slice(0);
-          const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
-          const encrypted = CryptoJS.AES.encrypt(
-            wordArray,
-            hashedPassword
-          ).toString();
-          
-          const encryptedFileName = CryptoJS.AES.encrypt(
-            file.name,
-            hashedPassword
-          ).toString();
-          
-          // const unencryptedFileName = CryptoJS.AES.decrypt(
-          //   encryptedFileName,
-          //   hashedPassword
-          // ).toString(CryptoJS.enc.Utf8);
+      // Préparation des données à envoyer
+      const sendToServer = new FormData();
 
-          // Create a new FormData instance
-          const formData = new FormData();
+      sendToServer.append("file", fileEnc, formData.file!.name + ".enc");
+      sendToServer.append("password", encryptionPassword);
+      sendToServer.append("email", formData.email);
+      sendToServer.append("expiryTime", formData.expiryTime.toString());
+      sendToServer.append("singleUseLink", formData.singleUseLink.toString());
 
-          // Create a blob from the encrypted file string
-          const blob = new Blob([encrypted], { type: "text/plain" });
-
-          // Append the blob to the FormData instance
-          formData.append("file", blob, encryptedFileName);
-
-          formData.append("password", hashedPassword);
-
-          formData.append("expiryTime", expiryTime.toString());
-
-          formData.append("singleUseLink", singleUseLink.toString());
-
-          formData.append("email", email);
-
-          // console.log({ formData });
-
-          // Send encrypted file to your server
-
-          fetch("http://localhost:8000/upload", {
-            method: "POST",
-            body: formData,
-          })
-            .then((response) => response.json())
-            .then((data) => {
-              console.log("Success:", data);
-              // Here you can handle the unique link returned by the server
-            })
-            .catch((error) => {
-              console.error("Error:", error);
-            });
+      // Envoi du fichier chiffré au serveur
+      try {
+        const response = await fetch("http://localhost:8000/upload", {
+          method: "POST",
+          body: sendToServer,
+        });
+        if (response.ok) {
+          console.log("Fichier envoyé avec succès");
+          //clear form
+          // const form = document.getElementById("uploadForm") as HTMLFormElement;
+          // form.reset();
+        } else {
+          console.error("Erreur lors de l'envoi du fichier");
         }
-      };
-
-      reader.readAsArrayBuffer(file);
-    }
+      } catch (error) {
+        console.error("Erreur lors de l'envoi du fichier", error);
+      }
+    };
+    reader.readAsArrayBuffer(formData.file!);
   };
 
   return (
     <div>
       <h1>Plateforme de stockage de fichiers sécurisée</h1>
-
       <form
         id="uploadForm"
         encType="multipart/form-data"
@@ -113,57 +78,51 @@ function HomePage() {
           type="file"
           id="file"
           name="file"
-          onChange={handleFileChange}
+          onChange={handleChange}
           required
         />
         <br />
-
         <input
           type="password"
           id="encryptionPassword"
-          name="encryptionPassword"
+          name="password"
           placeholder="Mot de passe de chiffrement"
-          onChange={handlePasswordChange}
+          onChange={handleChange}
           required
         />
         <br />
         <input
           type="date"
           id="expiryTime"
+          name="expiryTime"
           min={
             new Date(new Date().getTime() + 24 * 60 * 60 * 1000)
               .toISOString()
               .split("T")[0]
           }
-          name="expiryTime"
           placeholder="Délai d'expiration"
-          onChange={handleExpiryTimeChange}
+          onChange={handleChange}
         />
         <br />
-
         <label htmlFor="singleUseLink">Lien à usage unique</label>
         <input
           type="checkbox"
           id="singleUseLink"
           name="singleUseLink"
-          onChange={handleSingleUseLinkChange}
+          onChange={handleChange}
         />
         <br />
-
         <input
           type="email"
           id="email"
           name="email"
           placeholder="Email pour envoyer le lien"
-          onChange={handleEmailChange}
+          onChange={handleChange}
           required
         />
         <br />
-
         <input type="submit" value="Téléverser" />
       </form>
-
-      {/* Here you can add the download form */}
     </div>
   );
 }

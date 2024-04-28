@@ -15,7 +15,8 @@ function DownloadsPage() {
     formData.append("password", hashedPassword);
 
     try {
-      const response = await fetch("http://localhost:8000/download", {
+      console.log(formData);
+      const response = await fetch("http://localhost:8000/download/", {
         method: "POST",
         body: formData,
       });
@@ -26,80 +27,66 @@ function DownloadsPage() {
         throw new Error("Network response was not ok");
       }
 
-      const hashedFileName = response.headers.get("Content-Disposition");
-      console.log("filename : " + hashedFileName)
+      const filename = response.headers.get("Content-Disposition");
+      console.log("filename : " + filename);
 
-      if (!hashedFileName) {
+      if (!filename) {
         throw new Error("No Content-Disposition header found");
       }
 
-      const blob = await response.blob();
-      console.log("blob:", blob.text);
+      const encrypted = await response.blob();
 
-      const arrayBuffer = await blob.arrayBuffer();
-      console.log("arrayBuffer:", arrayBuffer.slice);
+      console.log(encrypted.text());
 
-      // Convertir ArrayBuffer en WordArray de CryptoJS
-      const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
-      console.log("wordArray:", wordArray.words);
+      // Convert Blob to File
+      const file = new File([encrypted], filename);
 
+      decrypt(file, hashedPassword);
 
-      // Convertir WordArray en chaîne Base64
-      const encryptedData = wordArray.toString(CryptoJS.enc.Base64);
-
-
-      console.log("hash : " + hashedPassword);
-      // Décrypter les données
-      const decrypted = CryptoJS.AES.decrypt(
-        encryptedData,
-        hashedPassword,
-
-      ).toString();
-
-
-      /*const decrypted = CryptoJS.AES.decrypt(
-        encryptedData,
-        hashedPassword,
-        {
-          mode: CryptoJS.mode.CFB,
-          padding: CryptoJS.pad.Pkcs7,
-        }
-      );
-      */
-
-      console.log("decrycpter : " + decrypted);
-
-      // Convertir le résultat décrypté en texte UTF-8
-      //const decryptedText = decrypted.toString(CryptoJS.enc.Utf8);
-      //console.log("decrypted text:", decryptedText);
-
-
-      // Convertir le texte décrypté en Blob pour téléchargement
-      const decryptedBlob = new Blob([decrypted], {
-        type: "application/octet-stream",
-      });
-
-
-      const url = window.URL.createObjectURL(decryptedBlob);
-      const a = document.createElement("a");
-      console.log(a);
-      a.href = url;
-      a.download = "decrypted_file.png"; // Utilisez le nom de fichier approprié
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      a.remove();
-
-
-      console.log("Success:", decrypted);
-
+      console.log("Success:");
     } catch (error) {
       console.error("Error downloading the file:", error);
     }
   };
 
+  function convertWordArrayToUint8Array(wordArray: any) {
+    var arrayOfWords = wordArray.hasOwnProperty("words") ? wordArray.words : [];
+    var length = wordArray.hasOwnProperty("sigBytes")
+      ? wordArray.sigBytes
+      : arrayOfWords.length * 4;
+    var uInt8Array = new Uint8Array(length),
+      index = 0,
+      word,
+      i;
+    for (i = 0; i < length; i++) {
+      word = arrayOfWords[i];
+      uInt8Array[index++] = word >> 24;
+      uInt8Array[index++] = (word >> 16) & 0xff;
+      uInt8Array[index++] = (word >> 8) & 0xff;
+      uInt8Array[index++] = word & 0xff;
+    }
+    return uInt8Array;
+  }
 
+  function decrypt(file: File, key: string) {
+    var reader = new FileReader();
+    reader.onload = () => {
+      var decrypted = CryptoJS.AES.decrypt(reader.result as any, key); // Decryption: I: Base64 encoded string (OpenSSL-format) -> O: WordArray
+      var typedArray = convertWordArrayToUint8Array(decrypted); // Convert: WordArray -> typed array
 
+      var fileDec = new Blob([typedArray]); // Create blob from typed array
+
+      var a = document.createElement("a");
+      var url = window.URL.createObjectURL(fileDec);
+      // remove .enc extension
+      var filename = file.name.substr(0, file.name.length - 4);
+      a.href = url;
+      a.download = filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    };
+    reader.readAsText(file);
+  }
 
   return (
     <div>
@@ -118,16 +105,3 @@ function DownloadsPage() {
 }
 
 export default DownloadsPage;
-
-function blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      resolve(reader.result as ArrayBuffer);
-    };
-    reader.onerror = (e) => {
-      reject(new Error("Failed to read blob to arrayBuffer"));
-    };
-    reader.readAsArrayBuffer(blob);
-  });
-}

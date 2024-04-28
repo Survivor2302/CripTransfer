@@ -8,6 +8,7 @@ import shutil
 import smtplib
 from email.message import EmailMessage
 import json
+from urllib.parse import quote
 
 
 app = FastAPI()
@@ -71,14 +72,14 @@ async def upload_file(
     singleUseLink: bool = Form(...),
     email: str = Form(...)
 ):
-    # Générer un ID unique pour le fichier
-    file_id = uuid.uuid4()
+
+    file_id = str(uuid.uuid4())
 
     upload_folder = Path('uploads')
     upload_folder.mkdir(exist_ok=True)
 
     # Encode the filename to a safe format
-    file_path = upload_folder.joinpath(str(file_id))
+    file_path = upload_folder.joinpath(file.filename)
 
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -89,7 +90,7 @@ async def upload_file(
     # Ajout du fichier à la liste
     files = read_json_db()
     files.append({
-        "file_id": str(file_id),
+        "file_id": file_id,
         "file_name": file.filename,
         "password": password,
         "expiration": expiryTime.isoformat(),
@@ -97,7 +98,7 @@ async def upload_file(
     })
     write_json_db(files)
 
-    return {"file_id": str(file_id)}
+    return {"file_name": file.filename}
 
 
 def send_email(file_id, receiver_email):
@@ -116,26 +117,23 @@ def send_email(file_id, receiver_email):
 # Fonction pour télécharger le fichier
 @app.post("/download/")
 async def download_file(file_id: str = Form(...), password: str = Form(...)):
+    print(file_id)
     files = read_json_db()
-   # print(files)
-    #print(file_id)
-    #print("les données sont : " + file + " pour le file id suivant : " + file_id)
     try:
         file = next(file for file in files if file["file_id"] == file_id)
-        print("les données sont : ")
+        print('file')
         print(file)
-        print("pour le file id suivant :")
-        print(file_id)
         if file["password"] != password:
             raise HTTPException(
                 status_code=401, detail="Mot de passe incorrect")
-        print("ouai")
-        file_path = Path('uploads').joinpath(file["file_id"])
-        print("file_path : ")
-        print(file_path)
-
-        return FileResponse(file_path, filename=file["file_name"])
+        file_path = Path('uploads').joinpath(file["file_name"])
+        # Assurez-vous que le nom du fichier est URL-safe
+        response = FileResponse(file_path, headers={
+            'Content-Disposition': f'attachment; filename="{quote(file["file_name"])}"'
+        })
+        return response
     except Exception as e:
+        print('aze')
         print(e)
-    raise HTTPException(status_code=500, detail="Une erreur s'est produite lors de la gestion de la requête")
-
+    raise HTTPException(
+        status_code=500, detail="Une erreur s'est produite lors de la gestion de la requête")
