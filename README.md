@@ -19,8 +19,7 @@ source venv/bin/activate
 # installer les dépendance
 
 ```
-#### Pour l'api :
-pip install -r requirements.txt
+Pour l'api : pip install -r requirements.txt
 
 Pour le front : npm i
 
