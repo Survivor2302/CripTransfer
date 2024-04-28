@@ -14,21 +14,18 @@ function DownloadsPage() {
     formData.append("file_id", id!);
     formData.append("password", hashedPassword);
 
+    // Envoi des données à la fonction Download et récupération de la réponse
     try {
-      console.log(formData);
       const response = await fetch("http://localhost:8000/download/", {
         method: "POST",
         body: formData,
       });
-
-      console.log(response);
 
       if (!response.ok) {
         throw new Error("Network response was not ok");
       }
 
       const filename = response.headers.get("Content-Disposition");
-      console.log("filename : " + filename);
 
       if (!filename) {
         throw new Error("No Content-Disposition header found");
@@ -42,6 +39,8 @@ function DownloadsPage() {
       const file = new File([encrypted], filename);
 
       decrypt(file, hashedPassword);
+
+      await deleteFileFromServer(id!);
 
       console.log("Success:");
     } catch (error) {
@@ -68,24 +67,52 @@ function DownloadsPage() {
     return uInt8Array;
   }
 
+
+  // Fonction pour decrypter le fichier
   function decrypt(file: File, key: string) {
     var reader = new FileReader();
     reader.onload = () => {
-      var decrypted = CryptoJS.AES.decrypt(reader.result as any, key); // Decryption: I: Base64 encoded string (OpenSSL-format) -> O: WordArray
-      var typedArray = convertWordArrayToUint8Array(decrypted); // Convert: WordArray -> typed array
+      var decrypted = CryptoJS.AES.decrypt(reader.result as any, key);
+      var typedArray = convertWordArrayToUint8Array(decrypted);
 
-      var fileDec = new Blob([typedArray]); // Create blob from typed array
+      var fileDec = new Blob([typedArray]);
 
       var a = document.createElement("a");
       var url = window.URL.createObjectURL(fileDec);
       // remove .enc extension
-      var filename = file.name.substr(0, file.name.length - 4);
+      var filename = file.name.substr(0, file.name.length - 5).slice(22);
+
+      if (filename.endsWith('_')) {
+        return filename.slice(0, -1);
+      }
+
       a.href = url;
       a.download = filename;
       a.click();
       window.URL.revokeObjectURL(url);
     };
     reader.readAsText(file);
+  }
+
+  // Fonction pour supprimer le fichier si il est en download unique
+  async function deleteFileFromServer(file_id: string) {
+    const formData = new FormData();
+    formData.append("file_id", file_id);
+
+    try {
+      const response = await fetch("http://localhost:8000/delete_file/", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la suppression du fichier.");
+      }
+
+      console.log("Le fichier a été supprimé du serveur avec succès.");
+    } catch (error) {
+      console.error("Erreur lors de la suppression du fichier : ", error);
+    }
   }
 
   return (

@@ -1,4 +1,5 @@
 import datetime
+import os
 import uuid
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
@@ -9,6 +10,11 @@ import smtplib
 from email.message import EmailMessage
 import json
 from urllib.parse import quote
+import datetime
+import os
+import time
+import schedule  
+
 
 
 app = FastAPI()
@@ -28,16 +34,15 @@ json_db_path = 'files_db.json'
 
 app.add_middleware(
     CORSMiddleware,
-    # Vous pouvez remplacer "*" par l'URL de votre application React
+    
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition"]
 )
-# Initialiser le fichier JSON s'il n'existe pas
 
-
+# Initialise le fichier JSON s'il n'existe pas
 def init_json_db():
     try:
         with open(json_db_path, 'x') as f:
@@ -63,7 +68,7 @@ def write_json_db(data):
 async def root():
     return {"message": "Hello World"}
 
-
+# Fonction pour upload dans la bdd le fichier et envoyé le mail 
 @app.post("/upload/")
 async def upload_file(
     file: UploadFile = File(...),
@@ -78,7 +83,7 @@ async def upload_file(
     upload_folder = Path('uploads')
     upload_folder.mkdir(exist_ok=True)
 
-    # Encode the filename to a safe format
+    # crypte le fichier
     file_path = upload_folder.joinpath(file.filename)
 
     with open(file_path, "wb") as buffer:
@@ -100,7 +105,7 @@ async def upload_file(
 
     return {"file_name": file.filename}
 
-
+# fonction pour envoyer un email
 def send_email(file_id, receiver_email):
     file_link = f"http://localhost:3000/download/{file_id}"
     msg = EmailMessage()
@@ -113,27 +118,75 @@ def send_email(file_id, receiver_email):
     server.send_message(msg)
     print("Email envoyé")
 
-
-# Fonction pour télécharger le fichier
+# Fonction pour download un fichier
 @app.post("/download/")
 async def download_file(file_id: str = Form(...), password: str = Form(...)):
-    print(file_id)
+   
     files = read_json_db()
+
+    # cherche le fichier dans la bdd
     try:
         file = next(file for file in files if file["file_id"] == file_id)
-        print('file')
-        print(file)
+
+        # Vérifie le mdp
         if file["password"] != password:
-            raise HTTPException(
-                status_code=401, detail="Mot de passe incorrect")
+            raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+        
+        # Vérifie la date d'expiration
+        expiration_time = datetime.datetime.fromisoformat(file["expiration"])
+        current_time = datetime.datetime.now()
+
+        if current_time > expiration_time:
+            # Si le fichier est expiré on le supprime
+            file_path = Path('uploads').joinpath(file["file_name"])
+
+            # Supprime le fichier du dossier uploads
+            if file_path.exists():
+                file_path.unlink()  
+
+            # Supprime le fichier de la bdd
+            files = [f for f in files if f["file_id"] != file_id]
+            write_json_db(files)
+
+            
+            return print("message : Le fichier est expiré et a été supprimé.")
+
         file_path = Path('uploads').joinpath(file["file_name"])
-        # Assurez-vous que le nom du fichier est URL-safe
+
+        # Renvoi le fichier dans la reponse
         response = FileResponse(file_path, headers={
             'Content-Disposition': f'attachment; filename="{quote(file["file_name"])}"'
         })
+        
         return response
+
     except Exception as e:
-        print('aze')
-        print(e)
-    raise HTTPException(
-        status_code=500, detail="Une erreur s'est produite lors de la gestion de la requête")
+        print(f"Erreur : {e}")
+        raise HTTPException(status_code=500, detail="Une erreur s'est produite lors de la gestion de la requête")
+    
+@app.post("/delete_file/")
+async def delete_file(file_id: str = Form(...)):
+    try:
+        
+        files = read_json_db()
+
+        # Cherche le fichier dans la bdd
+        file = next(file for file in files if file["file_id"] == file_id)
+        if file["is_unique"]:
+            # Supprime le fichier de la bdd
+            files = [f for f in files if f["file_id"] != file_id]
+            write_json_db(files)
+
+            # Supprime le fichier du dossier uploads
+            file_path = Path('uploads').joinpath(file["file_name"])
+            if file_path.exists():
+                file_path.unlink()  
+
+        return {"message": "Le fichier a été supprimé avec succès."}
+
+    except StopIteration:    
+        return {"error": "Fichier non trouvé."}
+
+    except Exception as e:
+        return {"error": f"Une erreur s'est produite : {e}"}
+    

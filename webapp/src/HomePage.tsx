@@ -20,6 +20,7 @@ function HomePage() {
     }));
   };
 
+  // cryptage du fichier
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     var reader = new FileReader();
@@ -27,15 +28,15 @@ function HomePage() {
       var encryptionPassword = CryptoJS.SHA256(formData.password).toString();
       var wordArray = CryptoJS.lib.WordArray.create(
         reader.result as ArrayBuffer
-      ); // Convert: ArrayBuffer -> WordArray
+      );
       var encrypted = CryptoJS.AES.encrypt(
         wordArray,
         encryptionPassword
-      ).toString(); // Encryption: I: WordArray -> O: -> Base64 encoded string (OpenSSL-format)
+      ).toString();
 
-      var fileEnc = new Blob([encrypted]); // Create blob from string
+      var fileEnc = new Blob([encrypted]);
 
-      // Préparation des données à envoyer
+
       const sendToServer = new FormData();
 
       sendToServer.append("file", fileEnc, formData.file!.name + ".enc");
@@ -44,7 +45,7 @@ function HomePage() {
       sendToServer.append("expiryTime", formData.expiryTime.toString());
       sendToServer.append("singleUseLink", formData.singleUseLink.toString());
 
-      // Envoi du fichier chiffré au serveur
+      // Envoi du fichier crypté au serveur
       try {
         const response = await fetch("http://localhost:8000/upload", {
           method: "POST",
@@ -52,9 +53,7 @@ function HomePage() {
         });
         if (response.ok) {
           console.log("Fichier envoyé avec succès");
-          //clear form
-          // const form = document.getElementById("uploadForm") as HTMLFormElement;
-          // form.reset();
+
         } else {
           console.error("Erreur lors de l'envoi du fichier");
         }
