@@ -19,18 +19,18 @@ source venv/bin/activate
 # installer les dépendance
 
 ```
-pip install -r requirements.txt
+Pour l'api : pip install -r requirements.txt
 
-npm i
+Pour le front : npm i
 
 ```
 
 # lancer le projet :
 
 ```
-uvicorn api:app --reload
+Pour l'api : uvicorn api:app --reload
 
-npm start
+Pour le front : npm start
 
 ```
 
